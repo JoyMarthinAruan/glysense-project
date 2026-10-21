@@ -1,0 +1,5 @@
+Best Parameters:
+{'subsample': 0.9, 'n_estimators': 300, 'min_child_weight': 5, 'max_depth': 4, 'learning_rate': 0.03, 'colsample_bytree': 1.0}
+
+Best Macro F1 Cross-Validation:
+0.5181

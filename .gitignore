@@ -1,0 +1,25 @@
+# Environment dan rahasia
+.env
+.env.*
+!.env.example
+
+# Laravel
+glysense_backend/vendor/
+glysense_backend/node_modules/
+glysense_backend/storage/logs/*
+glysense_backend/bootstrap/cache/*.php
+
+# Flutter	
+glysense_app/.dart_tool/
+glysense_app/build/
+glysense_app/android/local.properties
+
+# Editor
+.vscode/
+
+# Cache Python
+__pycache__/
+*.py[cod]
+
+# Model besar disimpan terpisah di Google Drive
+glysense_backend/artifacts/random_forest_final.joblib
