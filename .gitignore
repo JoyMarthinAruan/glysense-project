@@ -23,3 +23,7 @@ __pycache__/
 
 # Model besar disimpan terpisah di Google Drive
 glysense_backend/artifacts/random_forest_final.joblib
+
+# Python virtual environment
+glysense_backend/venv/
+venv/	

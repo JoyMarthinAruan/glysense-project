@@ -44,7 +44,7 @@ print(X.shape)
 # ============================================================
 
 rf_params = {
-    "n_estimators": 400,
+    "n_estimators": 400, 
     "min_samples_split": 10,
     "min_samples_leaf": 2,
     "max_features": "sqrt",
