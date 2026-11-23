@@ -1,16 +1,20 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;   // BARU
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static String get baseUrl {
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000';
-    }
+  static const bool _pakaiServer = true; // ubah ke false untuk backend lokal
+  static const String _serverUrl = 'http://172.22.44.30:8000';
 
+  static String get baseUrl {
+    if (_pakaiServer) return _serverUrl;
+    if (kIsWeb) return 'http://127.0.0.1:8000';
+    if (Platform.isAndroid) return 'http://10.0.2.2:8000';
     return 'http://127.0.0.1:8000';
-  }
+  
+}
 
   static Future<Map<String, dynamic>> predictDiabetes({
     required int highBP,
@@ -78,9 +82,7 @@ class ApiService {
     }
 
     throw Exception(
-      'Gagal melakukan prediksi. '
-      'Status code: ${response.statusCode}\n'
-      'Response: ${response.body}',
+      'Gagal melakukan prediksi: ${response.statusCode}',
     );
   }
 }

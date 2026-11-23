@@ -1,9 +1,18 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware   # BARU
 from pydantic import BaseModel, Field
 
 from model.predict import predict_diabetes
 
 app = FastAPI()
+
+# BARU: izinkan akses dari browser (Flutter Web) saat pengembangan
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class PatientInput(BaseModel):

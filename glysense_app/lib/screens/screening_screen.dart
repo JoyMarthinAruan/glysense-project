@@ -1,28 +1,93 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
+import '../widgets/form_widgets.dart';
 import 'result_screen.dart';
 
 class ScreeningScreen extends StatefulWidget {
   const ScreeningScreen({super.key});
 
   @override
-  State<ScreeningScreen> createState() =>
-      _ScreeningScreenState();
+  State<ScreeningScreen> createState() => _ScreeningScreenState();
 }
 
-class _ScreeningScreenState
-    extends State<ScreeningScreen> {
-  final _formKey = GlobalKey<FormState>();
+class _ScreeningScreenState extends State<ScreeningScreen> {
+  static const int _jumlahLangkah = 5;
 
-  final TextEditingController bmiController =
-      TextEditingController();
+  static const List<String> _judulLangkah = [
+    'Data Diri',
+    'Tubuh',
+    'Riwayat Kesehatan',
+    'Gaya Hidup',
+    'Kondisi Umum',
+  ];
 
-  final TextEditingController mentHlthController =
-      TextEditingController();
+  static const List<String> _deskripsiLangkah = [
+    'Informasi dasar untuk membantu skrining.',
+    'Tinggi dan berat badan dipakai untuk menghitung BMI.',
+    'Jawab sesuai kondisi Anda saat ini atau yang pernah dialami.',
+    'Kebiasaan sehari-hari yang memengaruhi risiko.',
+    'Gambaran kesehatan Anda secara umum.',
+  ];
 
-  final TextEditingController physHlthController =
-      TextEditingController();
+  static const List<Opsi> _opsiKelamin = [
+    Opsi(1, 'Laki-laki'),
+    Opsi(0, 'Perempuan'),
+  ];
+
+  static const List<Opsi> _opsiUsia = [
+    Opsi(1, '18–24 tahun'),
+    Opsi(2, '25–29 tahun'),
+    Opsi(3, '30–34 tahun'),
+    Opsi(4, '35–39 tahun'),
+    Opsi(5, '40–44 tahun'),
+    Opsi(6, '45–49 tahun'),
+    Opsi(7, '50–54 tahun'),
+    Opsi(8, '55–59 tahun'),
+    Opsi(9, '60–64 tahun'),
+    Opsi(10, '65–69 tahun'),
+    Opsi(11, '70–74 tahun'),
+    Opsi(12, '75–79 tahun'),
+    Opsi(13, '80 tahun atau lebih'),
+  ];
+
+  static const List<Opsi> _opsiPendidikan = [
+    Opsi(1, 'Tidak pernah sekolah / TK'),
+    Opsi(2, 'SD kelas 1–8'),
+    Opsi(3, 'Sebagian SMA'),
+    Opsi(4, 'Lulus SMA'),
+    Opsi(5, 'Kuliah 1–3 tahun'),
+    Opsi(6, 'Lulus perguruan tinggi'),
+  ];
+
+  static const List<Opsi> _opsiPendapatan = [
+    Opsi(1, 'Kurang dari \$10.000'),
+    Opsi(2, '\$10.000–\$14.999'),
+    Opsi(3, '\$15.000–\$19.999'),
+    Opsi(4, '\$20.000–\$24.999'),
+    Opsi(5, '\$25.000–\$34.999'),
+    Opsi(6, '\$35.000–\$49.999'),
+    Opsi(7, '\$50.000–\$74.999'),
+    Opsi(8, '\$75.000 atau lebih'),
+  ];
+
+  static const List<Opsi> _opsiKondisiUmum = [
+    Opsi(1, 'Sangat baik'),
+    Opsi(2, 'Baik'),
+    Opsi(3, 'Cukup'),
+    Opsi(4, 'Kurang'),
+    Opsi(5, 'Buruk'),
+  ];
+
+  final ScrollController _scroll = ScrollController();
+  final TextEditingController _tinggiController = TextEditingController();
+  final TextEditingController _beratController = TextEditingController();
+
+  int _langkah = 0;
+  bool _tampilkanError = false;
+  bool _isLoading = false;
 
   int? highBP;
   int? highChol;
@@ -43,84 +108,205 @@ class _ScreeningScreenState
   int? education;
   int? income;
 
-  bool isLoading = false;
+  int mentHealth = 0;
+  int physHealth = 0;
 
   @override
   void dispose() {
-    bmiController.dispose();
-    mentHlthController.dispose();
-    physHlthController.dispose();
-
+    _scroll.dispose();
+    _tinggiController.dispose();
+    _beratController.dispose();
     super.dispose();
   }
 
-  List<DropdownMenuItem<int>> yesNoItems() {
-    return const [
-      DropdownMenuItem(
-        value: 0,
-        child: Text('Tidak'),
-      ),
-      DropdownMenuItem(
-        value: 1,
-        child: Text('Ya'),
-      ),
-    ];
+  // -------------------------------------------------------------------------
+  // BMI dari tinggi dan berat
+  // -------------------------------------------------------------------------
+  double? _angka(String teks) {
+    return double.tryParse(teks.trim().replaceAll(',', '.'));
   }
 
-  Widget buildDropdown({
-    required String label,
-    required int? value,
-    required List<DropdownMenuItem<int>> items,
-    required void Function(int?) onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 16,
-      ),
-      child: DropdownButtonFormField<int>(
-        value: value,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(
-            borderRadius:
-                BorderRadius.circular(12),
-          ),
-        ),
-        items: items,
-        onChanged: onChanged,
-        validator: (value) {
-          if (value == null) {
-            return 'Silakan pilih jawaban';
-          }
+  double? get _tinggi => _angka(_tinggiController.text);
+  double? get _berat => _angka(_beratController.text);
 
-          return null;
-        },
+  double? get _bmi {
+    final double? t = _tinggi;
+    final double? b = _berat;
+
+    if (t == null || b == null || t <= 0 || b <= 0) {
+      return null;
+    }
+
+    final double meter = t / 100;
+    return b / (meter * meter);
+  }
+
+  String? get _errorTinggi {
+    if (!_tampilkanError) {
+      return null;
+    }
+
+    final double? t = _tinggi;
+    if (t == null || t < 100 || t > 250) {
+      return 'Masukkan tinggi 100 sampai 250 cm';
+    }
+    return null;
+  }
+
+  String? get _errorBerat {
+    if (!_tampilkanError) {
+      return null;
+    }
+
+    final double? b = _berat;
+    if (b == null || b < 20 || b > 300) {
+      return 'Masukkan berat 20 sampai 300 kg';
+    }
+    return null;
+  }
+
+  bool get _bmiValid {
+    final double? t = _tinggi;
+    final double? b = _berat;
+    final double? bmi = _bmi;
+
+    if (t == null || b == null || bmi == null) {
+      return false;
+    }
+
+    return t >= 100 && t <= 250 && b >= 20 && b <= 300 && bmi >= 12 && bmi <= 98;
+  }
+
+  String _kategoriBmi(double bmi) {
+    if (bmi < 18.5) {
+      return 'Berat badan kurang';
+    }
+    if (bmi < 25) {
+      return 'Normal';
+    }
+    if (bmi < 30) {
+      return 'Berat badan lebih';
+    }
+    return 'Obesitas';
+  }
+
+  Color _warnaBmi(double bmi) {
+    if (bmi >= 18.5 && bmi < 25) {
+      return AppColors.riskLow;
+    }
+    if (bmi < 30) {
+      return AppColors.riskMedium;
+    }
+    return AppColors.riskHigh;
+  }
+
+  // -------------------------------------------------------------------------
+  // Validasi dan navigasi langkah
+  // -------------------------------------------------------------------------
+  bool _langkahValid(int langkah) {
+    switch (langkah) {
+      case 0:
+        return sex != null && age != null && education != null && income != null;
+      case 1:
+        return _bmiValid;
+      case 2:
+        return highBP != null &&
+            highChol != null &&
+            cholCheck != null &&
+            stroke != null &&
+            heartDisease != null &&
+            diffWalk != null;
+      case 3:
+        return smoker != null &&
+            physActivity != null &&
+            fruits != null &&
+            veggies != null &&
+            heavyAlcohol != null;
+      default:
+        return genHealth != null && anyHealthcare != null && noDocCost != null;
+    }
+  }
+
+  void _keAtas() {
+    if (_scroll.hasClients) {
+      _scroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _pesan(String teks) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(teks),
+        backgroundColor: AppColors.riskHigh,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  Future<void> prosesSkrining() async {
-    if (!_formKey.currentState!.validate()) {
+  void _lanjut() {
+    if (!_langkahValid(_langkah)) {
+      setState(() {
+        _tampilkanError = true;
+      });
+      _pesan('Lengkapi isian yang ditandai merah.');
+      _keAtas();
       return;
     }
 
     setState(() {
-      isLoading = true;
+      _langkah++;
+      _tampilkanError = false;
+    });
+    _keAtas();
+  }
+
+  void _kembali() {
+    if (_langkah == 0 || _isLoading) {
+      return;
+    }
+
+    setState(() {
+      _langkah--;
+      _tampilkanError = false;
+    });
+    _keAtas();
+  }
+
+  Future<void> _prosesSkrining() async {
+    // Periksa seluruh langkah; lompat ke langkah pertama yang belum lengkap.
+    for (int i = 0; i < _jumlahLangkah; i++) {
+      if (!_langkahValid(i)) {
+        setState(() {
+          _langkah = i;
+          _tampilkanError = true;
+        });
+        _pesan('Masih ada isian yang belum lengkap pada langkah ${i + 1}.');
+        _keAtas();
+        return;
+      }
+    }
+
+    final double bmiMentah = _bmi!;
+    final double bmi = double.parse(bmiMentah.toStringAsFixed(1));
+
+    setState(() {
+      _isLoading = true;
     });
 
     try {
-      final Map<String, dynamic> result =
-          await ApiService.predictDiabetes(
+      final Map<String, dynamic> result = await ApiService.predictDiabetes(
         highBP: highBP!,
         highChol: highChol!,
         cholCheck: cholCheck!,
-        bmi: double.parse(
-          bmiController.text,
-        ),
+        bmi: bmi,
         smoker: smoker!,
         stroke: stroke!,
-        heartDiseaseOrAttack:
-            heartDisease!,
+        heartDiseaseOrAttack: heartDisease!,
         physActivity: physActivity!,
         fruits: fruits!,
         veggies: veggies!,
@@ -128,12 +314,8 @@ class _ScreeningScreenState
         anyHealthcare: anyHealthcare!,
         noDocCost: noDocCost!,
         genHealth: genHealth!,
-        mentHealth: int.parse(
-          mentHlthController.text,
-        ),
-        physHealth: int.parse(
-          physHlthController.text,
-        ),
+        mentHealth: mentHealth,
+        physHealth: physHealth,
         diffWalk: diffWalk!,
         sex: sex!,
         age: age!,
@@ -145,13 +327,10 @@ class _ScreeningScreenState
         return;
       }
 
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              ResultScreen(
-            result: result,
-          ),
+          builder: (context) => ResultScreen(result: result),
         ),
       );
     } catch (error) {
@@ -159,591 +338,424 @@ class _ScreeningScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Terjadi kesalahan: $error',
-          ),
-          backgroundColor: Colors.red,
-        ),
+      final String teks = error.toString();
+      final bool masalahJaringan = teks.contains('SocketException') ||
+          teks.contains('ClientException') ||
+          teks.contains('Connection') ||
+          teks.contains('TimeoutException');
+
+      _pesan(
+        masalahJaringan
+            ? 'Tidak dapat terhubung ke server. Pastikan backend sedang '
+                'berjalan dan alamat server sudah benar.'
+            : 'Terjadi kesalahan: $error',
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Skrining GlySense',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
+  // -------------------------------------------------------------------------
+  // Isi tiap langkah
+  // -------------------------------------------------------------------------
+  Widget _jarak() => const SizedBox(height: 12);
+
+  List<Widget> _isiLangkah() {
+    switch (_langkah) {
+      case 0:
+        return [
+          ChoiceTile(
+            label: 'Jenis kelamin',
+            opsi: _opsiKelamin,
+            value: sex,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => sex = v),
           ),
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding:
-                const EdgeInsets.all(20),
-            children: [
-              const Text(
-                'Data Kesehatan dan Gaya Hidup',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+          _jarak(),
+          PickerField(
+            label: 'Kelompok usia',
+            opsi: _opsiUsia,
+            value: age,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => age = v),
+          ),
+          _jarak(),
+          PickerField(
+            label: 'Tingkat pendidikan',
+            opsi: _opsiPendidikan,
+            value: education,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => education = v),
+          ),
+          _jarak(),
+          PickerField(
+            label: 'Pendapatan tahunan',
+            opsi: _opsiPendapatan,
+            value: income,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => income = v),
+          ),
+        ];
+
+      case 1:
+        final double? bmi = _bmi;
+
+        return [
+          NumberBox(
+            label: 'Tinggi badan',
+            suffix: 'cm',
+            hint: 'Contoh: 165',
+            controller: _tinggiController,
+            errorText: _errorTinggi,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+          NumberBox(
+            label: 'Berat badan',
+            suffix: 'kg',
+            hint: 'Contoh: 60',
+            controller: _beratController,
+            errorText: _errorBerat,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 18),
+          SoftCard(
+            child: Row(
+              children: [
+                IconBadge(
+                  icon: Icons.monitor_weight_rounded,
+                  color: bmi == null ? AppColors.textSecondary : _warnaBmi(bmi),
+                  size: 52,
                 ),
-              ),
-
-              const SizedBox(height: 8),
-
-              const Text(
-                'Isi data berikut sesuai kondisi Anda. '
-                'Data digunakan untuk membantu proses skrining awal.',
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.5,
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              buildDropdown(
-                label:
-                    'Apakah memiliki tekanan darah tinggi?',
-                value: highBP,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    highBP = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Apakah memiliki kolesterol tinggi?',
-                value: highChol,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    highChol = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Pernah melakukan pemeriksaan kolesterol?',
-                value: cholCheck,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    cholCheck = value;
-                  });
-                },
-              ),
-
-              TextFormField(
-                controller:
-                    bmiController,
-                keyboardType:
-                    const TextInputType
-                        .numberWithOptions(
-                  decimal: true,
-                ),
-                decoration:
-                    InputDecoration(
-                  labelText: 'BMI',
-                  hintText:
-                      'Contoh: 24.5',
-                  border:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius
-                            .circular(12),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'BMI Anda',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        bmi == null ? '–' : bmi.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                validator: (value) {
-                  final double? bmi =
-                      double.tryParse(
-                    value ?? '',
-                  );
-
-                  if (bmi == null ||
-                      bmi <= 0) {
-                    return 'Masukkan BMI yang valid';
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              buildDropdown(
-                label:
-                    'Apakah pernah merokok?',
-                value: smoker,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    smoker = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Apakah pernah mengalami stroke?',
-                value: stroke,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    stroke = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Apakah memiliki penyakit jantung/serangan jantung?',
-                value: heartDisease,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    heartDisease =
-                        value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Apakah melakukan aktivitas fisik?',
-                value: physActivity,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    physActivity =
-                        value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Apakah rutin mengonsumsi buah?',
-                value: fruits,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    fruits = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Apakah rutin mengonsumsi sayur?',
-                value: veggies,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    veggies = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Apakah mengonsumsi alkohol secara berlebihan?',
-                value: heavyAlcohol,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    heavyAlcohol =
-                        value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Apakah memiliki akses layanan kesehatan?',
-                value: anyHealthcare,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    anyHealthcare =
-                        value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Pernah tidak ke dokter karena masalah biaya?',
-                value: noDocCost,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    noDocCost = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Kondisi kesehatan secara umum',
-                value: genHealth,
-                items: const [
-                  DropdownMenuItem(
-                    value: 1,
-                    child:
-                        Text('Sangat Baik'),
-                  ),
-                  DropdownMenuItem(
-                    value: 2,
-                    child:
-                        Text('Baik'),
-                  ),
-                  DropdownMenuItem(
-                    value: 3,
-                    child:
-                        Text('Cukup'),
-                  ),
-                  DropdownMenuItem(
-                    value: 4,
-                    child:
-                        Text('Kurang'),
-                  ),
-                  DropdownMenuItem(
-                    value: 5,
-                    child:
-                        Text('Buruk'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    genHealth = value;
-                  });
-                },
-              ),
-
-              TextFormField(
-                controller:
-                    mentHlthController,
-                keyboardType:
-                    TextInputType.number,
-                decoration:
-                    InputDecoration(
-                  labelText:
-                      'Hari kesehatan mental terganggu (0-30 hari)',
-                  hintText:
-                      'Contoh: 2',
-                  border:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius
-                            .circular(12),
-                  ),
-                ),
-                validator: (value) {
-                  final int? number =
-                      int.tryParse(
-                    value ?? '',
-                  );
-
-                  if (number == null ||
-                      number < 0 ||
-                      number > 30) {
-                    return 'Masukkan angka 0 sampai 30';
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              TextFormField(
-                controller:
-                    physHlthController,
-                keyboardType:
-                    TextInputType.number,
-                decoration:
-                    InputDecoration(
-                  labelText:
-                      'Hari kesehatan fisik terganggu (0-30 hari)',
-                  hintText:
-                      'Contoh: 3',
-                  border:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius
-                            .circular(12),
-                  ),
-                ),
-                validator: (value) {
-                  final int? number =
-                      int.tryParse(
-                    value ?? '',
-                  );
-
-                  if (number == null ||
-                      number < 0 ||
-                      number > 30) {
-                    return 'Masukkan angka 0 sampai 30';
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              buildDropdown(
-                label:
-                    'Apakah mengalami kesulitan berjalan?',
-                value: diffWalk,
-                items: yesNoItems(),
-                onChanged: (value) {
-                  setState(() {
-                    diffWalk = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label:
-                    'Jenis kelamin',
-                value: sex,
-                items: const [
-                  DropdownMenuItem(
-                    value: 0,
-                    child:
-                        Text('Perempuan'),
-                  ),
-                  DropdownMenuItem(
-                    value: 1,
-                    child:
-                        Text('Laki-laki'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    sex = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label: 'Kelompok usia',
-                value: age,
-                items: const [
-                  DropdownMenuItem(
-                    value: 1,
-                    child: Text('18–24 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 2,
-                    child: Text('25–29 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 3,
-                    child: Text('30–34 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 4,
-                    child: Text('35–39 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 5,
-                    child: Text('40–44 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 6,
-                    child: Text('45–49 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 7,
-                    child: Text('50–54 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 8,
-                    child: Text('55–59 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 9,
-                    child: Text('60–64 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 10,
-                    child: Text('65–69 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 11,
-                    child: Text('70–74 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 12,
-                    child: Text('75–79 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 13,
-                    child: Text('80 tahun atau lebih'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    age = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label: 'Tingkat pendidikan',
-                value: education,
-                items: const [
-                  DropdownMenuItem(
-                    value: 1,
-                    child: Text('Tidak pernah sekolah / TK'),
-                  ),
-                  DropdownMenuItem(
-                    value: 2,
-                    child: Text('SD kelas 1–8'),
-                  ),
-                  DropdownMenuItem(
-                    value: 3,
-                    child: Text('Sebagian SMA'),
-                  ),
-                  DropdownMenuItem(
-                    value: 4,
-                    child: Text('Lulus SMA'),
-                  ),
-                  DropdownMenuItem(
-                    value: 5,
-                    child: Text('Kuliah 1–3 tahun'),
-                  ),
-                  DropdownMenuItem(
-                    value: 6,
-                    child: Text('Lulus perguruan tinggi'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    education = value;
-                  });
-                },
-              ),
-
-              buildDropdown(
-                label: 'Pendapatan tahunan',
-                value: income,
-                items: const [
-                  DropdownMenuItem(
-                    value: 1,
-                    child: Text('Kurang dari \$10.000'),
-                  ),
-                  DropdownMenuItem(
-                    value: 2,
-                    child: Text('\$10.000–\$14.999'),
-                  ),
-                  DropdownMenuItem(
-                    value: 3,
-                    child: Text('\$15.000–\$19.999'),
-                  ),
-                  DropdownMenuItem(
-                    value: 4,
-                    child: Text('\$20.000–\$24.999'),
-                  ),
-                  DropdownMenuItem(
-                    value: 5,
-                    child: Text('\$25.000–\$34.999'),
-                  ),
-                  DropdownMenuItem(
-                    value: 6,
-                    child: Text('\$35.000–\$49.999'),
-                  ),
-                  DropdownMenuItem(
-                    value: 7,
-                    child: Text('\$50.000–\$74.999'),
-                  ),
-                  DropdownMenuItem(
-                    value: 8,
-                    child: Text('\$75.000 atau lebih'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    income = value;
-                  });
-                },
-              ),
-
-              const SizedBox(height: 8),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed:
-                      isLoading
-                          ? null
-                          : prosesSkrining,
-                  style:
-                      ElevatedButton
-                          .styleFrom(
-                    padding:
-                        const EdgeInsets
-                            .symmetric(
-                      vertical: 16,
+                if (bmi != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _warnaBmi(bmi).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _kategoriBmi(bmi),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: _warnaBmi(bmi),
+                      ),
                     ),
                   ),
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child:
-                              CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text(
-                          'Proses Skrining',
-                          style:
-                              TextStyle(
-                            fontSize: 17,
-                            fontWeight:
-                                FontWeight
-                                    .w600,
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const InfoBanner(
+            icon: Icons.info_outline_rounded,
+            color: AppColors.primary,
+            text: 'BMI dihitung otomatis dari tinggi dan berat badan. '
+                'Gunakan titik atau koma untuk desimal.',
+          ),
+        ];
+
+      case 2:
+        return [
+          ChoiceTile(
+            label: 'Apakah memiliki tekanan darah tinggi?',
+            opsi: opsiYaTidak,
+            value: highBP,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => highBP = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Apakah memiliki kolesterol tinggi?',
+            opsi: opsiYaTidak,
+            value: highChol,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => highChol = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Pernah melakukan pemeriksaan kolesterol?',
+            hint: 'Dalam 5 tahun terakhir.',
+            opsi: opsiYaTidak,
+            value: cholCheck,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => cholCheck = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Apakah pernah mengalami stroke?',
+            opsi: opsiYaTidak,
+            value: stroke,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => stroke = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Apakah memiliki penyakit jantung/serangan jantung?',
+            opsi: opsiYaTidak,
+            value: heartDisease,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => heartDisease = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Apakah mengalami kesulitan berjalan?',
+            hint: 'Termasuk kesulitan menaiki tangga.',
+            opsi: opsiYaTidak,
+            value: diffWalk,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => diffWalk = v),
+          ),
+        ];
+
+      case 3:
+        return [
+          ChoiceTile(
+            label: 'Apakah pernah merokok?',
+            hint: 'Setidaknya 100 batang rokok sepanjang hidup.',
+            opsi: opsiYaTidak,
+            value: smoker,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => smoker = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Apakah melakukan aktivitas fisik?',
+            hint: 'Di luar pekerjaan, dalam 30 hari terakhir.',
+            opsi: opsiYaTidak,
+            value: physActivity,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => physActivity = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Apakah rutin mengonsumsi buah?',
+            hint: 'Satu kali atau lebih per hari.',
+            opsi: opsiYaTidak,
+            value: fruits,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => fruits = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Apakah rutin mengonsumsi sayur?',
+            hint: 'Satu kali atau lebih per hari.',
+            opsi: opsiYaTidak,
+            value: veggies,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => veggies = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Apakah mengonsumsi alkohol secara berlebihan?',
+            opsi: opsiYaTidak,
+            value: heavyAlcohol,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => heavyAlcohol = v),
+          ),
+        ];
+
+      default:
+        return [
+          ChoiceTile(
+            label: 'Kondisi kesehatan secara umum',
+            opsi: _opsiKondisiUmum,
+            value: genHealth,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => genHealth = v),
+          ),
+          _jarak(),
+          DaysSliderTile(
+            label: 'Hari kesehatan mental terganggu',
+            hint: 'Dalam 30 hari terakhir (stres, depresi, atau masalah emosi).',
+            value: mentHealth,
+            onChanged: (v) => setState(() => mentHealth = v),
+          ),
+          _jarak(),
+          DaysSliderTile(
+            label: 'Hari kesehatan fisik terganggu',
+            hint: 'Dalam 30 hari terakhir (sakit atau cedera).',
+            value: physHealth,
+            onChanged: (v) => setState(() => physHealth = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Apakah memiliki akses layanan kesehatan?',
+            hint: 'Misalnya asuransi atau jaminan kesehatan.',
+            opsi: opsiYaTidak,
+            value: anyHealthcare,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => anyHealthcare = v),
+          ),
+          _jarak(),
+          ChoiceTile(
+            label: 'Pernah tidak ke dokter karena masalah biaya?',
+            hint: 'Dalam 12 bulan terakhir.',
+            opsi: opsiYaTidak,
+            value: noDocCost,
+            showError: _tampilkanError,
+            onChanged: (v) => setState(() => noDocCost = v),
+          ),
+        ];
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Tampilan
+  // -------------------------------------------------------------------------
+  @override
+  Widget build(BuildContext context) {
+    final bool terakhir = _langkah == _jumlahLangkah - 1;
+
+    return PopScope(
+      canPop: _langkah == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _kembali();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Skrining GlySense')),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Langkah ${_langkah + 1} dari $_jumlahLangkah',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
                           ),
                         ),
+                        const Spacer(),
+                        Text(
+                          _judulLangkah[_langkah],
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: (_langkah + 1) / _jumlahLangkah,
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(8),
+                      backgroundColor: AppColors.border,
+                      color: AppColors.primary,
+                    ),
+                  ],
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              const Text(
-                'Hasil skrining bukan merupakan diagnosis medis.',
-                textAlign:
-                    TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey,
+              Expanded(
+                child: ListView(
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                  children: [
+                    Text(
+                      _judulLangkah[_langkah],
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _deskripsiLangkah[_langkah],
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    ..._isiLangkah(),
+                    if (terakhir) ...[
+                      const SizedBox(height: 18),
+                      const DisclaimerBanner(
+                        text: 'Hasil skrining bukan merupakan diagnosis medis.',
+                      ),
+                    ],
+                  ],
                 ),
               ),
-
-              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                child: Row(
+                  children: [
+                    if (_langkah > 0) ...[
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : _kembali,
+                          child: const Text('Kembali'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      flex: 3,
+                      child: FilledButton(
+                        onPressed: _isLoading
+                            ? null
+                            : (terakhir ? _prosesSkrining : _lanjut),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(terakhir ? 'Proses Skrining' : 'Lanjut'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
